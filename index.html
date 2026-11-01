@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mobile Pong</title>
+
+<style>
+:root{
+  --bg:#0d1117;
+  --line:#c9d1d9;
+  --paddle:#58a6ff;
+  --ball:#f0f6fc;
+  --score:#e6edf3;
+}
+
+*{
+  box-sizing:border-box;
+  margin:0;
+  padding:0;
+}
+
+body{
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  background:radial-gradient(circle at top,#1f2937,var(--bg));
+  font-family:Arial,Helvetica,sans-serif;
+  color:var(--score);
+}
+
+.scoreboard{
+  width:min(95vw,800px);
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  font-size:2rem;
+  font-weight:bold;
+  margin-bottom:10px;
+}
+
+#game{
+  position:relative;
+  width:min(95vw,800px);
+  height:min(60vh,480px);
+  background:#111;
+  border:3px solid var(--line);
+  overflow:hidden;
+}
+
+#game::before{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:0;
+  width:4px;
+  height:100%;
+  transform:translateX(-50%);
+  background:repeating-linear-gradient(
+    to bottom,
+    white,
+    white 20px,
+    transparent 20px,
+    transparent 40px
+  );
+}
+
+.paddle{
+  position:absolute;
+  width:14px;
+  height:100px;
+  background:var(--paddle);
+  border-radius:10px;
+}
+
+#ball{
+  position:absolute;
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  background:var(--ball);
+}
+
+/* Mobile Controls */
+
+.mobile-controls{
+  margin-top:15px;
+  display:flex;
+  gap:20px;
+}
+
+.mobile-controls button{
+  width:90px;
+  height:90px;
+  font-size:36px;
+  border:none;
+  border-radius:15px;
+  background:#58a6ff;
+  color:white;
+  font-weight:bold;
+  touch-action:none;
+}
+
+.mobile-controls button:active{
+  transform:scale(0.95);
+}
+
+@media(min-width:900px){
+
+  .mobile-controls{
+    display:none;
+  }
+
+}
+</style>
+</head>
+
+<body>
+
+<div class="scoreboard">
+  <div id="leftScore">0</div>
+  <div>PONG</div>
+  <div id="rightScore">0</div>
+</div>
+
+<div id="game">
+  <div id="leftPaddle" class="paddle"></div>
+  <div id="rightPaddle" class="paddle"></div>
+  <div id="ball"></div>
+</div>
+
+<div class="mobile-controls">
+  <button id="upBtn">⬆</button>
+  <button id="downBtn">⬇</button>
+</div>
+
+<script>
+
+const board=document.getElementById("game");
+
+const leftPaddleEl=document.getElementById("leftPaddle");
+const rightPaddleEl=document.getElementById("rightPaddle");
+const ballEl=document.getElementById("ball");
+
+const leftScoreEl=document.getElementById("leftScore");
+const rightScoreEl=document.getElementById("rightScore");
+
+const upBtn=document.getElementById("upBtn");
+const downBtn=document.getElementById("downBtn");
+
+const boardWidth=board.clientWidth;
+const boardHeight=board.clientHeight;
+
+const leftPaddle={
+  width:14,
+  height:100,
+  x:20,
+  y:(boardHeight-100)/2,
+  speed:8
+};
+
+const rightPaddle={
+  width:14,
+  height:100,
+  x:boardWidth-34,
+  y:(boardHeight-100)/2
+};
+
+const ball={
+  size:18,
+  x:boardWidth/2,
+  y:boardHeight/2,
+  vx:5,
+  vy:3,
+  speed:5
+};
+
+let leftScore=0;
+let rightScore=0;
+
+const keys={
+  ArrowUp:false,
+  ArrowDown:false
+};
+
+function clamp(v,min,max){
+  return Math.min(Math.max(v,min),max);
+}
+
+function updateScoreboard(){
+  leftScoreEl.textContent=leftScore;
+  rightScoreEl.textContent=rightScore;
+}
+
+function resetBall(dir){
+
+  ball.x=boardWidth/2;
+  ball.y=boardHeight/2;
+
+  ball.speed=5;
+
+  ball.vx=dir*ball.speed;
+  ball.vy=(Math.random()*4)-2;
+}
+
+function render(){
+
+  leftPaddleEl.style.left=leftPaddle.x+"px";
+  leftPaddleEl.style.top=leftPaddle.y+"px";
+
+  rightPaddleEl.style.left=rightPaddle.x+"px";
+  rightPaddleEl.style.top=rightPaddle.y+"px";
+
+  ballEl.style.left=(ball.x-ball.size/2)+"px";
+  ballEl.style.top=(ball.y-ball.size/2)+"px";
+}
+
+function updateLeftPaddle(){
+
+  if(keys.ArrowUp){
+    leftPaddle.y-=leftPaddle.speed;
+  }
+
+  if(keys.ArrowDown){
+    leftPaddle.y+=leftPaddle.speed;
+  }
+
+  leftPaddle.y=clamp(
+    leftPaddle.y,
+    0,
+    boardHeight-leftPaddle.height
+  );
+}
+
+function updateRightPaddle(){
+
+  let target=ball.y-rightPaddle.height/2;
+
+  rightPaddle.y+=(target-rightPaddle.y)*0.10;
+
+  rightPaddle.y=clamp(
+    rightPaddle.y,
+    0,
+    boardHeight-rightPaddle.height
+  );
+}
+
+function paddleCollision(paddle,isLeft){
+
+  const ballLeft=ball.x-ball.size/2;
+  const ballRight=ball.x+ball.size/2;
+  const ballTop=ball.y-ball.size/2;
+  const ballBottom=ball.y+ball.size/2;
+
+  const paddleLeft=paddle.x;
+  const paddleRight=paddle.x+paddle.width;
+  const paddleTop=paddle.y;
+  const paddleBottom=paddle.y+paddle.height;
+
+  if(
+    ballRight>paddleLeft &&
+    ballLeft<paddleRight &&
+    ballBottom>paddleTop &&
+    ballTop<paddleBottom
+  ){
+
+    const hit=
+      (ball.y-(paddle.y+paddle.height/2))
+      /(paddle.height/2);
+
+    if(isLeft){
+      ball.vx=Math.abs(ball.vx);
+    }else{
+      ball.vx=-Math.abs(ball.vx);
+    }
+
+    ball.vy=hit*5;
+  }
+}
+
+function updateBall(){
+
+  ball.x+=ball.vx;
+  ball.y+=ball.vy;
+
+  if(ball.y<=ball.size/2 ||
+     ball.y>=boardHeight-ball.size/2){
+      ball.vy*=-1;
+  }
+
+  paddleCollision(leftPaddle,true);
+  paddleCollision(rightPaddle,false);
+
+  if(ball.x<0){
+    rightScore++;
+    updateScoreboard();
+    resetBall(1);
+  }
+
+  if(ball.x>boardWidth){
+    leftScore++;
+    updateScoreboard();
+    resetBall(-1);
+  }
+}
+
+/* Keyboard */
+
+window.addEventListener("keydown",(e)=>{
+  if(e.key in keys){
+    keys[e.key]=true;
+  }
+});
+
+window.addEventListener("keyup",(e)=>{
+  if(e.key in keys){
+    keys[e.key]=false;
+  }
+});
+
+/* Mobile Buttons */
+
+function upStart(){
+  keys.ArrowUp=true;
+}
+
+function upStop(){
+  keys.ArrowUp=false;
+}
+
+function downStart(){
+  keys.ArrowDown=true;
+}
+
+function downStop(){
+  keys.ArrowDown=false;
+}
+
+upBtn.addEventListener("touchstart",upStart);
+upBtn.addEventListener("touchend",upStop);
+
+downBtn.addEventListener("touchstart",downStart);
+downBtn.addEventListener("touchend",downStop);
+
+upBtn.addEventListener("mousedown",upStart);
+upBtn.addEventListener("mouseup",upStop);
+
+downBtn.addEventListener("mousedown",downStart);
+downBtn.addEventListener("mouseup",downStop);
+
+function gameLoop(){
+
+  updateLeftPaddle();
+  updateRightPaddle();
+  updateBall();
+  render();
+
+  requestAnimationFrame(gameLoop);
+}
+
+updateScoreboard();
+resetBall(1);
+render();
+gameLoop();
+
+</script>
+
+</body>
+</html>
